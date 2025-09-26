@@ -34,33 +34,23 @@ jobs = [
     {'stream': 25, 'time': 10, 'size': 760},
 ]
 
-# Memory List
-memory = [
-    {'block': 1, 'size': 9500},
-    {'block': 2, 'size': 7000},
-    {'block': 3, 'size': 4500},
-    {'block': 4, 'size': 8500},
-    {'block': 5, 'size': 3000},
-    {'block': 6, 'size': 9000},
-    {'block': 7, 'size': 1000},
-    {'block': 8, 'size': 5500},
-    {'block': 9, 'size': 1500},
-    {'block': 10, 'size': 500},
-]
-
 # Improve memory list by adding a status to each block
 memory = [
-    {'block': 1, 'size': 9500, 'status': 'free'},
-    {'block': 2, 'size': 7000, 'status': 'free'},
-    {'block': 3, 'size': 4500, 'status': 'free'},
-    {'block': 4, 'size': 8500, 'status': 'free'},
-    {'block': 5, 'size': 3000, 'status': 'free'},
-    {'block': 6, 'size': 9000, 'status': 'free'},
-    {'block': 7, 'size': 1000, 'status': 'free'},
-    {'block': 8, 'size': 5500, 'status': 'free'},
-    {'block': 9, 'size': 1500, 'status': 'free'},
-    {'block': 10, 'size': 500, 'status': 'free'},
+    {'block': 1, 'size': 9500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 2, 'size': 7000, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 3, 'size': 4500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 4, 'size': 8500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 5, 'size': 3000, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 6, 'size': 9000, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 7, 'size': 1000, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 8, 'size': 5500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 9, 'size': 1500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 10, 'size': 500, 'status': 'free', 'job': None, 'internal_fragmentation': 0}
 ]
+
+
+
+
 # Define functions
 
 def first_fit(jobs, memory):
@@ -77,14 +67,33 @@ def first_fit(jobs, memory):
 def best_fit(jobs, memory):
     #  sort the memory block in ascending order based on their sizes.
     memory = sorted(memory, key=lambda x: x['size'])
+    # check the size of the incoming job against the memory blocks.
+    for job in jobs:
+        for block in memory:
+            if block['status'] == 'free' and block['size'] >= job['size']:
+                allocate_memory(job, block)
+                break
+        else:
+            print(f"Job {job['stream']} of size {job['size']} cannot be allocated.")
+   
+   
+   
+   
     pass
 
 def allocate_memory(job, block):
     # assign the job
     block['status'] = 'occupied'
+    # we need to show somewhere that a job is in a memory block.
     # after we put it in the memory, we need to know how much of the memory is being used and how much is wasted.
     # internal fragmentation
     size_wasted = block['size'] - job['size']
+
+    block['internal_fragmentation'] = size_wasted
+
+    # when a job leaves the memory block the internal fragmentation is set back to 0
+    # block['internal_fragmentation'] = 0
+
     pass
 
 
