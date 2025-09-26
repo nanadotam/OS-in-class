@@ -1,5 +1,7 @@
 import simpy
 import tkinter as tk
+# applying a queue for waiting jobs
+from queue import Queue
 
 '''
 This program is to simulate inserting jobs into memory blocks in a fixed partition interface.
@@ -86,7 +88,7 @@ def allocate_memory(job, block):
     block['status'] = 'occupied'
     # we need to show somewhere that a job is in a memory block.
     # after we put it in the memory, we need to know how much of the memory is being used and how much is wasted.
-    # internal fragmentation
+    # 2. calculate internal fragmentation
     size_wasted = block['size'] - job['size']
 
     block['internal_fragmentation'] = size_wasted
@@ -96,6 +98,20 @@ def allocate_memory(job, block):
 
     pass
 
+
+# waiting queue function
+# FIFO
+def waiting_queue(jobs, memory):
+    # so if a job wants to enter memory
+    # either the memory blocks are occupied
+    # OR its too big for the memory blocks
+    # we assign it into this waiting queue
+
+
+    # we need a case for when a job leaves memory or when a space is free
+
+    # we need a way to keep
+    pass
 
 
 
