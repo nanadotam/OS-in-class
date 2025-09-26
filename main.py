@@ -64,13 +64,32 @@ memory = [
 # Define functions
 
 def first_fit(jobs, memory):
+    # 1. check the memory status to see if there is any available memory block that can fit the job size.
+    for job in jobs:
+        for block in memory:
+            if block['status'] == 'free' and block['size'] >= job['size']:
+                allocate_memory(job, block)
+                break
+        else:
+            print(f"Job {job['stream']} of size {job['size']} cannot be allocated.")
     pass
 
 def best_fit(jobs, memory):
+    #  sort the memory block in ascending order based on their sizes.
+    memory = sorted(memory, key=lambda x: x['size'])
     pass
 
 def allocate_memory(job, block):
+    # assign the job
+    block['status'] = 'occupied'
+    # after we put it in the memory, we need to know how much of the memory is being used and how much is wasted.
+    # internal fragmentation
+    size_wasted = block['size'] - job['size']
     pass
+
+
+
+
 
 
 '''
