@@ -3,6 +3,7 @@ import tkinter as tk
 # applying a queue for waiting jobs
 from queue import Queue
 from colorama import init, Fore, Style
+import time  # added for real-time delay
 
 # initialize colorama
 init(autoreset=True)
@@ -54,97 +55,120 @@ memory = [
     {'block': 10, 'size': 500, 'status': 'free', 'job': None, 'internal_fragmentation': 0}
 ]
 
+# --------------------------
+# Memory Simulator Class
+# --------------------------
+class MemorySimulator:
+    def __init__(self, jobs, memory):
+        self.jobs = jobs
+        self.memory = memory
+        self.waiting_jobs = Queue()
+        self.env = None
 
-# global waiting queue
-waiting_jobs = Queue()
-
-# Define functions
-
-def first_fit(job, memory):
-    # 1. check the memory status to see if there is any available memory block that can fit the job size.
-    for block in memory:
-        if block['status'] == 'free' and block['size'] >= job['size']:
-            allocate_memory(job, block)
-            return block
-        
-    print(Fore.RED + f"Job {job['stream']} of size {job['size']} cannot be allocated.")
-    return None
-
-
-def best_fit(job, memory):
-    #  sort the memory block in ascending order based on their sizes.
-    for block in sorted(memory, key=lambda x: x['size']):
-        if block['status'] == 'free' and block['size'] >= job['size']:
-            allocate_memory(job, block)
-            return block
-
-    print(Fore.RED + f"Job {job['stream']} of size {job['size']} cannot be allocated.")
-    return None
-   
-
-def allocate_memory(job, block):
-    # assign the job
-    block['status'] = 'occupied'
-    block['job'] = job
-    size_wasted = block['size'] - job['size']
-    block['internal_fragmentation'] = size_wasted
-    print(Fore.GREEN + f"Job {job['stream']} allocated to Block {block['block']} (waste={size_wasted}).")
-
-
-def deallocate_memory(block):
-    # free space in memory 
-    finished_job = block['job']
-    block['status'] = 'free'
-    block['job'] = None
-    block['internal_fragmentation'] = 0
-    print(Fore.CYAN + f"Job {finished_job['stream']} finished. Block {block['block']} is now free.")
-    free_waiting_queue(memory)
-
-
-# waiting queue function
-# FIFO
-def waiting_queue(job):
-    """
-    Jobs that cant go in memory go here
-    """
-    print(Fore.YELLOW + f"Job {job['stream']} of size {job['size']} added to waiting queue.")
-    waiting_jobs.put(job)
-
-
-def free_waiting_queue(memory):
-    """
-    Frees up the waiting queue after a job has been entered
-    """
-    if waiting_jobs.empty():
-        return
-    
-    queue_length = waiting_jobs.qsize()
-    for _ in range(waiting_jobs.qsize()):
-        job = waiting_jobs.get()
-
-        for block in memory:
+    def first_fit(self, job):
+        # 1. check the memory status to see if there is any available memory block that can fit the job size.
+        for block in self.memory:
             if block['status'] == 'free' and block['size'] >= job['size']:
-                allocate_memory(job, block)
-                print(Fore.MAGENTA + f"Job {job['stream']} allocated from waiting queue to block {block['block']}.")
-                break   
+                self.allocate_memory(job, block)
+                return block
+        print(Fore.RED + f"Job {job['stream']} of size {job['size']} cannot be allocated.")
+        return None
 
+    def best_fit(self, job):
+        #  sort the memory block in ascending order based on their sizes.
+        for block in sorted(self.memory, key=lambda x: x['size']):
+            if block['status'] == 'free' and block['size'] >= job['size']:
+                self.allocate_memory(job, block)
+                return block
+        print(Fore.RED + f"Job {job['stream']} of size {job['size']} cannot be allocated.")
+        return None
+
+    def allocate_memory(self, job, block):
+        # assign the job
+        block['status'] = 'occupied'
+        block['job'] = job
+        size_wasted = block['size'] - job['size']
+        block['internal_fragmentation'] = size_wasted
+        if 'queue_entry_time' in job:  # calculate wait time if job came from queue
+            wait_time = self.env.now - job['queue_entry_time']
+            job['wait_time'] = wait_time
+            print(Fore.GREEN + f"Job {job['stream']} allocated to Block {block['block']} (waste={size_wasted}, waited {wait_time}).")
         else:
-            waiting_jobs.put(job)
-            print(Fore.RED + f"Job {job['stream']} remains in waiting queue.")
-            break
+            print(Fore.GREEN + f"Job {job['stream']} allocated to Block {block['block']} (waste={size_wasted}).")
 
+    def deallocate_memory(self, block):
+        # free space in memory 
+        finished_job = block['job']
+        block['status'] = 'free'
+        block['job'] = None
+        block['internal_fragmentation'] = 0
+        print(Fore.CYAN + f"Job {finished_job['stream']} finished. Block {block['block']} is now free.")
+        self.free_waiting_queue()
 
-def job_process(env, job, memory, strategy="first_fit"):
-    if strategy == "first_fit":
-        b = first_fit(job, memory)
-    else:
-        b = best_fit(job, memory)
+    # waiting queue function
+    # FIFO
+    def waiting_queue(self, job):
+        """
+        Jobs that cant go in memory go here
+        """
+        job['queue_entry_time'] = self.env.now  # record queue entry time
+        print(Fore.YELLOW + f"Job {job['stream']} of size {job['size']} added to waiting queue at t={self.env.now}.")
+        self.waiting_jobs.put(job)
 
-    if b is None:
-        waiting_queue(job)
-    else:
-        yield env.timeout(job['stream'])
-        deallocate_memory(b)
+    def free_waiting_queue(self):
+        """
+        Frees up the waiting queue after a job has been entered
+        """
+        if self.waiting_jobs.empty():
+            return
+
+        for _ in range(self.waiting_jobs.qsize()):
+            job = self.waiting_jobs.get()
+            for block in self.memory:
+                if block['status'] == 'free' and block['size'] >= job['size']:
+                    self.allocate_memory(job, block)
+                    print(Fore.MAGENTA + f"Job {job['stream']} allocated from waiting queue to block {block['block']} at t={self.env.now}.")
+                    break
+            else:
+                self.waiting_jobs.put(job)
+                print(Fore.RED + f"Job {job['stream']} remains in waiting queue.")
+                break
+
+    def job_process(self, env, job, strategy="first_fit"):
+        if strategy == "first_fit":
+            b = self.first_fit(job)
+        else:
+            b = self.best_fit(job)
+
+        if b is None:
+            self.waiting_queue(job)
+        else:
+            yield env.timeout(job['time'])
+            time.sleep(1)  # slow down for visualization
+            self.deallocate_memory(b)
+
+    def print_memory(self):
+        print("\n=== Memory Status ===")
+        for block in self.memory:
+            color = Fore.GREEN if block['status'] == 'free' else Fore.RED
+            print(color + f"Block {block['block']}: {block['status']} | size={block['size']} | job={block['job']} | waste={block['internal_fragmentation']}")
+        print("=====================\n")
+
+    def run_simulation(self, strategy):
+        self.env = simpy.Environment()
+        for job in self.jobs:
+            self.env.process(self.job_process(self.env, job, strategy))
+        self.env.run()
+        print(Fore.CYAN + "Simulation finished.")
+
+    def reset_memory(self):
+        for block in self.memory:
+            block['status'] = 'free'
+            block['job'] = None
+            block['internal_fragmentation'] = 0
+        while not self.waiting_jobs.empty():
+            self.waiting_jobs.get()
+
 
 # --------------------------
 #calculating metrics
@@ -181,24 +205,8 @@ class MemorySimulatorMetrics:
 # --------------------------
 # CLI Menu
 # --------------------------
-
-def print_memory():
-    print("\n=== Memory Status ===")
-    for block in memory:
-        color = Fore.GREEN if block['status'] == 'free' else Fore.RED
-        print(color + f"Block {block['block']}: {block['status']} | size={block['size']} | job={block['job']} | waste={block['internal_fragmentation']}")
-    print("=====================\n")
-
-
-def run_simulation(strategy):
-    env = simpy.Environment()
-    for job in jobs:
-        env.process(job_process(env, job, memory, strategy))
-    env.run()
-    print(Fore.CYAN + "Simulation finished.")
-
-
 def cli_menu():
+    sim = MemorySimulator(jobs, memory)
     while True:
         print("\n--- Memory Allocation Simulator ---")
         print("1. Run simulation (First Fit)")
@@ -208,27 +216,18 @@ def cli_menu():
         choice = input("Enter choice: ")
 
         if choice == "1":
-            reset_memory()
-            run_simulation("first_fit")
+            sim.reset_memory()
+            sim.run_simulation("first_fit")
         elif choice == "2":
-            reset_memory()
-            run_simulation("best_fit")
+            sim.reset_memory()
+            sim.run_simulation("best_fit")
         elif choice == "3":
-            print_memory()
+            sim.print_memory()
         elif choice == "4":
             print("Exiting program.")
             break
         else:
             print("Invalid choice, try again.")
-
-
-def reset_memory():
-    for block in memory:
-        block['status'] = 'free'
-        block['job'] = None
-        block['internal_fragmentation'] = 0
-    while not waiting_jobs.empty():
-        waiting_jobs.get()
 
 
 # --------------------------
