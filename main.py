@@ -143,7 +143,7 @@ def job_process(env, job, memory, strategy="first_fit"):
     if b is None:
         waiting_queue(job)
     else:
-        yield env.timeout(job['time'])
+        yield env.timeout(job['stream'])
         deallocate_memory(b)
 
 
