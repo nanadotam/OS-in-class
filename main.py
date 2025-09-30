@@ -146,6 +146,37 @@ def job_process(env, job, memory, strategy="first_fit"):
         yield env.timeout(job['stream'])
         deallocate_memory(b)
 
+# --------------------------
+#calculating metrics
+# Throughput: number of jobs completed per unit time
+# Waiting Time: total time a job spends in the system (waiting + execution)
+# Waiting Queue: number of jobs waiting to be allocated memory in the queue
+# --------------------------
+class MemorySimulatorMetrics:
+    def __init__(self):
+        self.total_jobs = 0
+        self.completed_jobs = 0
+        self.total_waiting_time = 0
+        self.waiting_jobs = 0
+
+    def job_started(self):
+        self.total_jobs += 1
+        self.waiting_jobs += 1
+
+    def job_completed(self, waiting_time):
+        self.completed_jobs += 1
+        self.total_waiting_time += waiting_time
+        self.waiting_jobs -= 1
+
+    def get_throughput(self):
+        return self.completed_jobs / self.total_jobs if self.total_jobs > 0 else 0
+
+    def get_average_waiting_time(self):
+        return self.total_waiting_time / self.completed_jobs if self.completed_jobs > 0 else 0
+
+    def get_waiting_queue_size(self):
+        return self.waiting_jobs
+
 
 # --------------------------
 # CLI Menu
