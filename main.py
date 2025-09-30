@@ -131,7 +131,30 @@ def waiting_queue(job, memory):
     pass
 
 
+def free_waiting_queue(memory):
+    """
+    Frees up the waiting queue after a job has been entered
+    """
+    if waiting_jobs.empty():
+        # print("No jobs in waiting queue.")
+        return
+    
+    for _ in range(waiting_jobs.qsize()):
+        job = waiting_jobs.get()
+        allocated = False
 
+        for block in memory:
+            if block['status'] == 'free' and block['size'] >= job['size']:
+                allocate_memory(job, block)
+                print(f"Job {job['stream']} of size {job['size']} allocated from waiting queue to block {block['block']}.")
+                allocated = True
+                break   
+
+        if not allocated:
+            waiting_jobs.put(job)
+            print(f"Job {job['stream']} of size {job['size']} remains in waiting queue.")
+            break
+    pass
 
 
 '''
