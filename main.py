@@ -87,6 +87,7 @@ def allocate_memory(job, block):
     # assign the job
     block['status'] = 'occupied'
     # we need to show somewhere that a job is in a memory block.
+    block['job'] = job
     # after we put it in the memory, we need to know how much of the memory is being used and how much is wasted.
     # 2. calculate internal fragmentation
     size_wasted = block['size'] - job['size']
@@ -95,6 +96,14 @@ def allocate_memory(job, block):
 
     # when a job leaves the memory block the internal fragmentation is set back to 0
     # block['internal_fragmentation'] = 0
+
+    pass
+
+def deallocate_memory(job, block):
+    # free space in memory 
+    block['status'] = 'free'
+    block['job'] = None
+    block['internal_fragmentation'] = 0
 
     pass
 
