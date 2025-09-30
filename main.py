@@ -51,7 +51,8 @@ memory = [
 ]
 
 
-
+# global waiting queue
+waiting_jobs = Queue()
 
 # Define functions
 
@@ -110,7 +111,14 @@ def deallocate_memory(block):
 
 # waiting queue function
 # FIFO
-def waiting_queue(jobs, memory):
+def waiting_queue(job, memory):
+    """
+    Jobs that cant go in memory go here
+    """
+    print(f"Job {job['stream']} of size {job['size']} added to waiting queue.")
+    waiting_jobs.put(job)
+
+
     # so if a job wants to enter memory
     # either the memory blocks are occupied
     # OR its too big for the memory blocks
