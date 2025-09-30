@@ -56,28 +56,29 @@ waiting_jobs = Queue()
 
 # Define functions
 
-def first_fit(jobs, memory):
+def first_fit(job, memory):
     # 1. check the memory status to see if there is any available memory block that can fit the job size.
-    for job in jobs:
-        for block in memory:
-            if block['status'] == 'free' and block['size'] >= job['size']:
-                allocate_memory(job, block)
-                break
+    for block in memory:
+        if block['status'] == 'free' and block['size'] >= job['size']:
+            allocate_memory(job, block)
+            return block
         else:
             print(f"Job {job['stream']} of size {job['size']} cannot be allocated.")
+            return None
     pass
 
-def best_fit(jobs, memory):
+def best_fit(job, memory):
     #  sort the memory block in ascending order based on their sizes.
     memory = sorted(memory, key=lambda x: x['size'])
     # check the size of the incoming job against the memory blocks.
-    for job in jobs:
-        for block in memory:
-            if block['status'] == 'free' and block['size'] >= job['size']:
-                allocate_memory(job, block)
-                break
+    
+    for block in memory:
+        if block['status'] == 'free' and block['size'] >= job['size']:
+            allocate_memory(job, block)
+            return block
         else:
             print(f"Job {job['stream']} of size {job['size']} cannot be allocated.")
+            return None
    
    
    
@@ -111,7 +112,7 @@ def deallocate_memory(block):
 
 # waiting queue function
 # FIFO
-def waiting_queue(job, memory):
+def waiting_queue(job):
     """
     Jobs that cant go in memory go here
     """
@@ -156,6 +157,24 @@ def free_waiting_queue(memory):
             break
     pass
 
+
+def job_process(env, job, memory):
+    b = first_fit(job, memory)   # Try allocating immediately
+    if b is None:
+        print(f"Job {job['stream']} could not go in memory. Adding to waiting queue.")
+        waiting_queue(job)
+    else:
+        yield env.timeout(job['time'])  # Job stays in memory for its duration
+        deallocate_memory(b)
+
+# --------------------------
+# Run simulation
+# --------------------------
+env = simpy.Environment()
+for job in jobs:
+    env.process(job_process(env, job, memory))
+
+env.run()
 
 '''
 # First-fit Algorithm
