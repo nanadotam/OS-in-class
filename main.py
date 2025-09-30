@@ -99,7 +99,7 @@ def allocate_memory(job, block):
 
     pass
 
-def deallocate_memory(job, block):
+def deallocate_memory(block):
     # free space in memory 
     block['status'] = 'free'
     block['job'] = None
