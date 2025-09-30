@@ -1,0 +1,20 @@
+Explain how the system handles conflicts when jobs are put into a waiting queue and there are jobs still entering the system.
+Which job goes first?
+
+
+Explain how the system handles the 'job clocks' which keep track of the amount of time each job has run, and the 'wait clocks',
+which keep track of how long each job in the waiting queue has to wait.
+
+Since this is an event driven system, explain how you define "event", and what happens in your system 
+when the event occurs.
+ An event is defined as a job(unused unit) arriving to be processed. When a job arrives, the system checks for available memory blocks
+ and allocates the job to a suitable block based on the selected strategy (first-fit or best-fit). If no suitable block is found, the job is added to a waiting queue.
+ When a job completes its processing time, it is removed from the memory block, and the block is marked as free. The system then checks the waiting queue to see if any waiting jobs can now be allocated to the freed block.
+
+
+
+
+Look at the results from the best-fit run and compare them with the results form the first-fit run.
+Explain what the results indicate about the performance of the system for this job mix and memmory organisation. Is one method
+of partitioning beterr than the other? Why or why not? Could you recommend one method over the other given your sample run? Would this hold in all cases? Write some 
+conclusions and recommendations
