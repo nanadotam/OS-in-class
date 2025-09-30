@@ -2,6 +2,10 @@ import simpy
 import tkinter as tk
 # applying a queue for waiting jobs
 from queue import Queue
+from colorama import init, Fore, Style
+
+# initialize colorama
+init(autoreset=True)
 
 '''
 This program is to simulate inserting jobs into memory blocks in a fixed partition interface.
@@ -62,52 +66,39 @@ def first_fit(job, memory):
         if block['status'] == 'free' and block['size'] >= job['size']:
             allocate_memory(job, block)
             return block
-        else:
-            print(f"Job {job['stream']} of size {job['size']} cannot be allocated.")
-            return None
-    pass
+        
+    print(Fore.RED + f"Job {job['stream']} of size {job['size']} cannot be allocated.")
+    return None
+
 
 def best_fit(job, memory):
     #  sort the memory block in ascending order based on their sizes.
-    memory = sorted(memory, key=lambda x: x['size'])
-    # check the size of the incoming job against the memory blocks.
-    
-    for block in memory:
+    for block in sorted(memory, key=lambda x: x['size']):
         if block['status'] == 'free' and block['size'] >= job['size']:
             allocate_memory(job, block)
             return block
-        else:
-            print(f"Job {job['stream']} of size {job['size']} cannot be allocated.")
-            return None
+
+    print(Fore.RED + f"Job {job['stream']} of size {job['size']} cannot be allocated.")
+    return None
    
-   
-   
-   
-    pass
 
 def allocate_memory(job, block):
     # assign the job
     block['status'] = 'occupied'
-    # we need to show somewhere that a job is in a memory block.
     block['job'] = job
-    # after we put it in the memory, we need to know how much of the memory is being used and how much is wasted.
-    # 2. calculate internal fragmentation
     size_wasted = block['size'] - job['size']
-
     block['internal_fragmentation'] = size_wasted
+    print(Fore.GREEN + f"Job {job['stream']} allocated to Block {block['block']} (waste={size_wasted}).")
 
-    # when a job leaves the memory block the internal fragmentation is set back to 0
-    # block['internal_fragmentation'] = 0
-
-    pass
 
 def deallocate_memory(block):
     # free space in memory 
+    finished_job = block['job']
     block['status'] = 'free'
     block['job'] = None
     block['internal_fragmentation'] = 0
-
-    pass
+    print(Fore.CYAN + f"Job {finished_job['stream']} finished. Block {block['block']} is now free.")
+    free_waiting_queue(memory)
 
 
 # waiting queue function
@@ -116,20 +107,8 @@ def waiting_queue(job):
     """
     Jobs that cant go in memory go here
     """
-    print(f"Job {job['stream']} of size {job['size']} added to waiting queue.")
+    print(Fore.YELLOW + f"Job {job['stream']} of size {job['size']} added to waiting queue.")
     waiting_jobs.put(job)
-
-
-    # so if a job wants to enter memory
-    # either the memory blocks are occupied
-    # OR its too big for the memory blocks
-    # we assign it into this waiting queue
-
-
-    # we need a case for when a job leaves memory or when a space is free
-
-    # we need a way to keep
-    pass
 
 
 def free_waiting_queue(memory):
@@ -137,44 +116,95 @@ def free_waiting_queue(memory):
     Frees up the waiting queue after a job has been entered
     """
     if waiting_jobs.empty():
-        # print("No jobs in waiting queue.")
         return
     
+    queue_length = waiting_jobs.qsize()
     for _ in range(waiting_jobs.qsize()):
         job = waiting_jobs.get()
-        allocated = False
 
         for block in memory:
             if block['status'] == 'free' and block['size'] >= job['size']:
                 allocate_memory(job, block)
-                print(f"Job {job['stream']} of size {job['size']} allocated from waiting queue to block {block['block']}.")
-                allocated = True
+                print(Fore.MAGENTA + f"Job {job['stream']} allocated from waiting queue to block {block['block']}.")
                 break   
 
-        if not allocated:
+        else:
             waiting_jobs.put(job)
-            print(f"Job {job['stream']} of size {job['size']} remains in waiting queue.")
+            print(Fore.RED + f"Job {job['stream']} remains in waiting queue.")
             break
-    pass
 
 
-def job_process(env, job, memory):
-    b = first_fit(job, memory)   # Try allocating immediately
+def job_process(env, job, memory, strategy="first_fit"):
+    if strategy == "first_fit":
+        b = first_fit(job, memory)
+    else:
+        b = best_fit(job, memory)
+
     if b is None:
-        print(f"Job {job['stream']} could not go in memory. Adding to waiting queue.")
         waiting_queue(job)
     else:
-        yield env.timeout(job['time'])  # Job stays in memory for its duration
+        yield env.timeout(job['time'])
         deallocate_memory(b)
 
-# --------------------------
-# Run simulation
-# --------------------------
-env = simpy.Environment()
-for job in jobs:
-    env.process(job_process(env, job, memory))
 
-env.run()
+# --------------------------
+# CLI Menu
+# --------------------------
+
+def print_memory():
+    print("\n=== Memory Status ===")
+    for block in memory:
+        color = Fore.GREEN if block['status'] == 'free' else Fore.RED
+        print(color + f"Block {block['block']}: {block['status']} | size={block['size']} | job={block['job']} | waste={block['internal_fragmentation']}")
+    print("=====================\n")
+
+
+def run_simulation(strategy):
+    env = simpy.Environment()
+    for job in jobs:
+        env.process(job_process(env, job, memory, strategy))
+    env.run()
+    print(Fore.CYAN + "Simulation finished.")
+
+
+def cli_menu():
+    while True:
+        print("\n--- Memory Allocation Simulator ---")
+        print("1. Run simulation (First Fit)")
+        print("2. Run simulation (Best Fit)")
+        print("3. Show memory status")
+        print("4. Exit")
+        choice = input("Enter choice: ")
+
+        if choice == "1":
+            reset_memory()
+            run_simulation("first_fit")
+        elif choice == "2":
+            reset_memory()
+            run_simulation("best_fit")
+        elif choice == "3":
+            print_memory()
+        elif choice == "4":
+            print("Exiting program.")
+            break
+        else:
+            print("Invalid choice, try again.")
+
+
+def reset_memory():
+    for block in memory:
+        block['status'] = 'free'
+        block['job'] = None
+        block['internal_fragmentation'] = 0
+    while not waiting_jobs.empty():
+        waiting_jobs.get()
+
+
+# --------------------------
+# Run CLI
+# --------------------------
+if __name__ == "__main__":
+    cli_menu()
 
 '''
 # First-fit Algorithm
