@@ -17,7 +17,7 @@ class MemoryBlock(QFrame):
     def __init__(self, block_data):
         super().__init__()
         self.block_data = block_data
-        self.setFixedHeight(60)
+        self.setFixedHeight(75)  # increased height to ensure all text is fully visible
         self.setFixedWidth(400)
         self.setFrameStyle(QFrame.Box)
         self.setLineWidth(2)
@@ -48,21 +48,24 @@ class MemoryBlock(QFrame):
         
         layout = QVBoxLayout()
         
-        # Block info
+        # Block info with improved visibility
         block_info = QLabel(f"Block {self.block_data['block']}: {self.block_data['size']:,} bytes")
-        block_info.setFont(QFont("Arial", 10, QFont.Bold))
+        block_info.setFont(QFont("Arial", 10, QFont.Bold))  # increased font size for better readability
         block_info.setAlignment(Qt.AlignCenter)
+        block_info.setStyleSheet("color: #000000; background-color: transparent;")  # ensure text is visible
         layout.addWidget(block_info)
         
         if self.block_data['status'] == 'occupied':
-            job_info = QLabel(f"Job {self.block_data['job']} | Fragmentation: {self.block_data['internal_fragmentation']:,}")
-            job_info.setFont(QFont("Arial", 8))
+            job_info = QLabel(f"Job {self.block_data['job']} | Frag: {self.block_data['internal_fragmentation']:,}")
+            job_info.setFont(QFont("Arial", 9))  # increased font size for better readability
             job_info.setAlignment(Qt.AlignCenter)
+            job_info.setStyleSheet("color: #000000; background-color: transparent;")  # ensure text is visible
             layout.addWidget(job_info)
         else:
             status_info = QLabel("FREE")
-            status_info.setFont(QFont("Arial", 9, QFont.Bold))
+            status_info.setFont(QFont("Arial", 10, QFont.Bold))  # increased font size for better readability
             status_info.setAlignment(Qt.AlignCenter)
+            status_info.setStyleSheet("color: #000000; background-color: transparent;")  # ensure text is visible
             layout.addWidget(status_info)
         
         self.setLayout(layout)
@@ -363,14 +366,13 @@ class MainWindow(QMainWindow):
         
         splitter.addWidget(left_panel)
         splitter.addWidget(right_panel)
-        splitter.setSizes([700, 700])
+        splitter.setSizes([500, 900])  # reduced left pane width, increased right pane
     
     def create_control_panel(self, layout):
         control_group = QGroupBox("Simulation Controls")
         control_layout = QGridLayout()
         
         # Algorithm selection
-        QLabel("Algorithm:", parent=control_group).setParent(control_group)
         control_layout.addWidget(QLabel("Algorithm:"), 0, 0)
         
         self.algorithm_combo = QComboBox()
@@ -481,28 +483,27 @@ class MainWindow(QMainWindow):
         memory_group = QGroupBox("Memory Block Visualization")
         memory_layout = QVBoxLayout()
         
-        # Create scroll area for memory blocks
-        scroll_area = QScrollArea()
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout()
+        # Create memory block widgets directly (no scrolling)
+        memory_layout.setSpacing(3)  # minimal spacing to fit all blocks
         
-        # Create memory block widgets
         for i, block in enumerate(self.simulator.memory):
             block_widget = MemoryBlock(block)
             self.memory_blocks_widgets.append(block_widget)
-            scroll_layout.addWidget(block_widget)
-        
-        scroll_widget.setLayout(scroll_layout)
-        scroll_area.setWidget(scroll_widget)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setMaximumHeight(400)
-        
-        memory_layout.addWidget(scroll_area)
+            memory_layout.addWidget(block_widget)
         
         memory_group.setLayout(memory_layout)
         layout.addWidget(memory_group)
+    
+    def create_info_panels(self, layout):
+        # create vertical splitter for right panel organization
+        v_splitter = QSplitter(Qt.Vertical)
         
-        # added waiting queue below memory blocks (moved from right panel)
+        # top section - waiting queue and performance metrics
+        top_section = QWidget()
+        top_layout = QVBoxLayout()
+        top_section.setLayout(top_layout)
+        
+        # waiting queue
         queue_group = QGroupBox("Waiting Queue")
         queue_layout = QVBoxLayout()
         
@@ -511,30 +512,42 @@ class MainWindow(QMainWindow):
         queue_layout.addWidget(self.queue_list)
         
         queue_group.setLayout(queue_layout)
-        layout.addWidget(queue_group)
+        top_layout.addWidget(queue_group)
         
-        # added performance metrics below waiting queue (moved from right panel)
+        # performance metrics
         stats_group = QGroupBox("Performance Metrics")
         stats_layout = QVBoxLayout()
         
         self.stats_text = QTextEdit()
-        self.stats_text.setMaximumHeight(200)  # limited height for better layout
+        self.stats_text.setMaximumHeight(150)  # reduced height to make room for chart
         self.stats_text.setFont(QFont("Courier", 9))
         stats_layout.addWidget(self.stats_text)
         
         stats_group.setLayout(stats_layout)
-        layout.addWidget(stats_group)
-    
-    def create_info_panels(self, layout):
-        # added matplotlib chart to right panel (simplified layout)
+        top_layout.addWidget(stats_group)
+        
+        # bottom section - scaled down chart
+        bottom_section = QWidget()
+        bottom_layout = QVBoxLayout()
+        bottom_section.setLayout(bottom_layout)
+        
+        # scaled down matplotlib chart
         chart_group = QGroupBox("Memory Allocation Chart")
         chart_layout = QVBoxLayout()
         
         self.memory_chart = MemoryCanvas()
+        self.memory_chart.setMaximumHeight(400)  # increased chart height for better visibility
         chart_layout.addWidget(self.memory_chart)
         
         chart_group.setLayout(chart_layout)
-        layout.addWidget(chart_group)
+        bottom_layout.addWidget(chart_group)
+        
+        # add sections to splitter
+        v_splitter.addWidget(top_section)
+        v_splitter.addWidget(bottom_section)
+        v_splitter.setSizes([250, 400])  # more space for chart, less for queue/metrics
+        
+        layout.addWidget(v_splitter)
     
     def create_job_table(self, layout):
         jobs_group = QGroupBox("Job Status")
@@ -721,3 +734,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
