@@ -293,7 +293,7 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("Fixed Partition Memory Management Simulator")
-        self.setGeometry(100, 100, 1400, 900)
+        self.setGeometry(100, 100, 1600, 1000)  # increased window size for better layout
         
         # Set application style
         self.setStyleSheet("""
@@ -377,21 +377,89 @@ class MainWindow(QMainWindow):
         self.algorithm_combo.addItems(["First Fit", "Best Fit"])
         control_layout.addWidget(self.algorithm_combo, 0, 1)
         
-        # Control buttons
+        # implemented control buttons with different colors for better visual distinction
         self.start_btn = QPushButton("▶ Start")
         self.start_btn.clicked.connect(self.start_simulation)
+        self.start_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;  /* green for start action */
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                text-align: center;
+                font-size: 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;  /* darker green on hover */
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;  /* even darker green when pressed */
+            }
+        """)
         control_layout.addWidget(self.start_btn, 0, 2)
         
         self.pause_btn = QPushButton("⏸ Pause")
         self.pause_btn.clicked.connect(self.pause_simulation)
+        self.pause_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;  /* orange for pause action */
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                text-align: center;
+                font-size: 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;  /* darker orange on hover */
+            }
+            QPushButton:pressed {
+                background-color: #E65100;  /* even darker orange when pressed */
+            }
+        """)
         control_layout.addWidget(self.pause_btn, 0, 3)
         
         self.step_btn = QPushButton("⏭ Step")
         self.step_btn.clicked.connect(self.step_simulation)
+        self.step_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;  /* blue for step action */
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                text-align: center;
+                font-size: 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;  /* darker blue on hover */
+            }
+            QPushButton:pressed {
+                background-color: #1565C0;  /* even darker blue when pressed */
+            }
+        """)
         control_layout.addWidget(self.step_btn, 1, 0)
         
         self.reset_btn = QPushButton("🔄 Reset")
         self.reset_btn.clicked.connect(self.reset_simulation)
+        self.reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #F44336;  /* red for reset action */
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                text-align: center;
+                font-size: 14px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #D32F2F;  /* darker red on hover */
+            }
+            QPushButton:pressed {
+                background-color: #C62828;  /* even darker red when pressed */
+            }
+        """)
         control_layout.addWidget(self.reset_btn, 1, 1)
         
         # Speed control
@@ -431,36 +499,42 @@ class MainWindow(QMainWindow):
         
         memory_layout.addWidget(scroll_area)
         
-        # Add matplotlib chart
-        self.memory_chart = MemoryCanvas()
-        memory_layout.addWidget(self.memory_chart)
-        
         memory_group.setLayout(memory_layout)
         layout.addWidget(memory_group)
-    
-    def create_info_panels(self, layout):
-        # Waiting queue
+        
+        # added waiting queue below memory blocks (moved from right panel)
         queue_group = QGroupBox("Waiting Queue")
         queue_layout = QVBoxLayout()
         
         self.queue_list = QListWidget()
-        self.queue_list.setMaximumHeight(150)
+        self.queue_list.setMaximumHeight(120)  # limited the height for better layout
         queue_layout.addWidget(self.queue_list)
         
         queue_group.setLayout(queue_layout)
         layout.addWidget(queue_group)
         
-        # Performance metrics
+        # added performance metrics below waiting queue (moved from right panel)
         stats_group = QGroupBox("Performance Metrics")
         stats_layout = QVBoxLayout()
         
         self.stats_text = QTextEdit()
-        self.stats_text.setMaximumHeight(300)
+        self.stats_text.setMaximumHeight(200)  # limited height for better layout
         self.stats_text.setFont(QFont("Courier", 9))
         stats_layout.addWidget(self.stats_text)
         
         stats_group.setLayout(stats_layout)
         layout.addWidget(stats_group)
+    
+    def create_info_panels(self, layout):
+        # added matplotlib chart to right panel (simplified layout)
+        chart_group = QGroupBox("Memory Allocation Chart")
+        chart_layout = QVBoxLayout()
+        
+        self.memory_chart = MemoryCanvas()
+        chart_layout.addWidget(self.memory_chart)
+        
+        chart_group.setLayout(chart_layout)
+        layout.addWidget(chart_group)
     
     def create_job_table(self, layout):
         jobs_group = QGroupBox("Job Status")
@@ -472,6 +546,7 @@ class MainWindow(QMainWindow):
             "Job", "Size", "Time", "Status", "Block", "Wait Time", "Arrival"
         ])
         self.job_table.setRowCount(len(self.simulator.jobs))
+        self.job_table.setMaximumHeight(250)  # limited the height for better layout
         
         jobs_layout.addWidget(self.job_table)
         jobs_group.setLayout(jobs_layout)
