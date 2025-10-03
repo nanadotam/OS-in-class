@@ -72,10 +72,10 @@ class MemoryBlock(QFrame):
 
 class MemoryCanvas(FigureCanvas):
     def __init__(self):
-        self.figure = Figure(figsize=(8, 6))
+        self.figure = Figure(figsize=(6, 4))  # reduced figure size to fit smaller pane
         super().__init__(self.figure)
         self.axes = self.figure.add_subplot(111)
-        self.setMinimumSize(600, 400)
+        self.setMinimumSize(400, 200)  # reduced minimum size to fit the constrained pane
     
     def update_chart(self, memory_blocks, algorithm):
         self.axes.clear()
@@ -366,7 +366,7 @@ class MainWindow(QMainWindow):
         
         splitter.addWidget(left_panel)
         splitter.addWidget(right_panel)
-        splitter.setSizes([500, 900])  # reduced left pane width, increased right pane
+        splitter.setSizes([490, 910])  # very small gap between left and right panels
     
     def create_control_panel(self, layout):
         control_group = QGroupBox("Simulation Controls")
@@ -483,24 +483,37 @@ class MainWindow(QMainWindow):
         memory_group = QGroupBox("Memory Block Visualization")
         memory_layout = QVBoxLayout()
         
-        # Create memory block widgets directly (no scrolling)
-        memory_layout.setSpacing(3)  # minimal spacing to fit all blocks
+        # Create scroll area for memory blocks (scrollable for different screen sizes)
+        scroll_area = QScrollArea()
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout()
+        scroll_layout.setSpacing(3)  # minimal spacing between blocks
         
+        # Create memory block widgets
         for i, block in enumerate(self.simulator.memory):
             block_widget = MemoryBlock(block)
             self.memory_blocks_widgets.append(block_widget)
-            memory_layout.addWidget(block_widget)
+            scroll_layout.addWidget(block_widget)
         
+        scroll_widget.setLayout(scroll_layout)
+        scroll_area.setWidget(scroll_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setMaximumHeight(600)  # limit height to allow scrolling on smaller screens
+        
+        memory_layout.addWidget(scroll_area)
         memory_group.setLayout(memory_layout)
         layout.addWidget(memory_group)
     
     def create_info_panels(self, layout):
         # create vertical splitter for right panel organization
         v_splitter = QSplitter(Qt.Vertical)
+        v_splitter.setContentsMargins(0, 0, 0, 0)  # remove margins from splitter
         
-        # top section - waiting queue and performance metrics
+        # top section - waiting queue and performance metrics side by side
         top_section = QWidget()
-        top_layout = QVBoxLayout()
+        top_layout = QHBoxLayout()  # changed to horizontal layout
+        top_layout.setSpacing(5)  # reduced horizontal spacing between columns
+        top_layout.setContentsMargins(0, 0, 0, 0)  # remove margins from top section
         top_section.setLayout(top_layout)
         
         # waiting queue
@@ -508,7 +521,7 @@ class MainWindow(QMainWindow):
         queue_layout = QVBoxLayout()
         
         self.queue_list = QListWidget()
-        self.queue_list.setMaximumHeight(120)  # limited the height for better layout
+        self.queue_list.setMaximumHeight(220)  # further increased height for better queue visibility
         queue_layout.addWidget(self.queue_list)
         
         queue_group.setLayout(queue_layout)
@@ -519,7 +532,7 @@ class MainWindow(QMainWindow):
         stats_layout = QVBoxLayout()
         
         self.stats_text = QTextEdit()
-        self.stats_text.setMaximumHeight(150)  # reduced height to make room for chart
+        self.stats_text.setMaximumHeight(220)  # further increased height for better metrics visibility
         self.stats_text.setFont(QFont("Courier", 9))
         stats_layout.addWidget(self.stats_text)
         
@@ -529,29 +542,35 @@ class MainWindow(QMainWindow):
         # bottom section - scaled down chart
         bottom_section = QWidget()
         bottom_layout = QVBoxLayout()
+        bottom_layout.setContentsMargins(0, 0, 0, 0)  # remove margins from bottom section
         bottom_section.setLayout(bottom_layout)
         
         # scaled down matplotlib chart
         chart_group = QGroupBox("Memory Allocation Chart")
+        chart_group.setMaximumHeight(300)  # limit the entire chart section size
         chart_layout = QVBoxLayout()
+        chart_layout.setContentsMargins(0, 0, 0, 0)  # remove margins from chart layout
+        chart_layout.setSpacing(0)  # remove spacing within chart layout
         
         self.memory_chart = MemoryCanvas()
-        self.memory_chart.setMaximumHeight(400)  # increased chart height for better visibility
+        self.memory_chart.setMaximumHeight(280)  # increased chart height for better visibility
         chart_layout.addWidget(self.memory_chart)
         
         chart_group.setLayout(chart_layout)
+        chart_group.setContentsMargins(0, 0, 0, 0)  # remove margins from chart group box
         bottom_layout.addWidget(chart_group)
         
-        # add sections to splitter
+        # add sections to splitter with more space for top section
         v_splitter.addWidget(top_section)
         v_splitter.addWidget(bottom_section)
-        v_splitter.setSizes([250, 400])  # more space for chart, less for queue/metrics
+        v_splitter.setSizes([280, 420])  # further increased top section space for queue and metrics
         
         layout.addWidget(v_splitter)
     
     def create_job_table(self, layout):
         jobs_group = QGroupBox("Job Status")
         jobs_layout = QVBoxLayout()
+        jobs_layout.setContentsMargins(0, 0, 0, 0)  # remove all margins for better alignment
         
         self.job_table = QTableWidget()
         self.job_table.setColumnCount(7)
@@ -559,7 +578,7 @@ class MainWindow(QMainWindow):
             "Job", "Size", "Time", "Status", "Block", "Wait Time", "Arrival"
         ])
         self.job_table.setRowCount(len(self.simulator.jobs))
-        self.job_table.setMaximumHeight(250)  # limited the height for better layout
+        self.job_table.setMaximumHeight(450)  # reduced height to balance with increased chart
         
         jobs_layout.addWidget(self.job_table)
         jobs_group.setLayout(jobs_layout)
