@@ -1,18 +1,69 @@
 import sys
-import copy
 from queue import Queue
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QGridLayout, QPushButton, QLabel, 
                             QComboBox, QTableWidget, QTableWidgetItem, QTextEdit,
-                            QListWidget, QSlider, QGroupBox, QProgressBar,
+                            QListWidget, QSlider, QGroupBox,
                             QSplitter, QFrame, QScrollArea)
-from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QFont, QPalette, QColor, QPainter, QBrush, QPen
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QFont, QPalette, QColor
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 
+# === import backend simulator (constructor requires jobs, memory) ===
+from backend import MemorySimulator as BackendMemorySimulator
+
+
+# --------------------------
+# ORIGINAL DATA (passed to backend)
+# --------------------------
+ORIGINAL_JOBS = [
+    {'stream': 1, 'time': 5, 'size': 5760, 'arrival_time': 0},
+    {'stream': 2, 'time': 4, 'size': 4190, 'arrival_time': 1},
+    {'stream': 3, 'time': 8, 'size': 3290, 'arrival_time': 2},
+    {'stream': 4, 'time': 2, 'size': 2030, 'arrival_time': 3},
+    {'stream': 5, 'time': 2, 'size': 2550, 'arrival_time': 4},
+    {'stream': 6, 'time': 6, 'size': 6990, 'arrival_time': 5},
+    {'stream': 7, 'time': 8, 'size': 8940, 'arrival_time': 6},
+    {'stream': 8, 'time': 10, 'size': 740, 'arrival_time': 7},
+    {'stream': 9, 'time': 7, 'size': 3930, 'arrival_time': 8},
+    {'stream': 10, 'time': 6, 'size': 6890, 'arrival_time': 9},
+    {'stream': 11, 'time': 5, 'size': 6580, 'arrival_time': 10},
+    {'stream': 12, 'time': 8, 'size': 3820, 'arrival_time': 11},
+    {'stream': 13, 'time': 9, 'size': 9140, 'arrival_time': 12},
+    {'stream': 14, 'time': 10, 'size': 420, 'arrival_time': 13},
+    {'stream': 15, 'time': 10, 'size': 220, 'arrival_time': 14},
+    {'stream': 16, 'time': 7, 'size': 7540, 'arrival_time': 15},
+    {'stream': 17, 'time': 3, 'size': 3210, 'arrival_time': 16},
+    {'stream': 18, 'time': 1, 'size': 1380, 'arrival_time': 17},
+    {'stream': 19, 'time': 9, 'size': 9850, 'arrival_time': 18},
+    {'stream': 20, 'time': 3, 'size': 3610, 'arrival_time': 19},
+    {'stream': 21, 'time': 7, 'size': 7540, 'arrival_time': 20},
+    {'stream': 22, 'time': 2, 'size': 2710, 'arrival_time': 21},
+    {'stream': 23, 'time': 8, 'size': 8390, 'arrival_time': 22},
+    {'stream': 24, 'time': 5, 'size': 5950, 'arrival_time': 23},
+    {'stream': 25, 'time': 10, 'size': 760, 'arrival_time': 24},
+]
+
+ORIGINAL_MEMORY = [
+    {'block': 1, 'size': 9500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 2, 'size': 7000, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 3, 'size': 4500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 4, 'size': 8500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 5, 'size': 3000, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 6, 'size': 9000, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 7, 'size': 1000, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 8, 'size': 5500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 9, 'size': 1500, 'status': 'free', 'job': None, 'internal_fragmentation': 0},
+    {'block': 10, 'size': 500, 'status': 'free', 'job': None, 'internal_fragmentation': 0}
+]
+
+
+# =================================================================
+# VISUAL BLOCK FOR MEMORY DISPLAY (same function/structure, safe tweaks)
+# =================================================================
 class MemoryBlock(QFrame):
     def __init__(self, block_data):
         super().__init__()
@@ -56,7 +107,10 @@ class MemoryBlock(QFrame):
         layout.addWidget(block_info)
         
         if self.block_data['status'] == 'occupied':
-            job_info = QLabel(f"Job {self.block_data['job']} | Frag: {self.block_data['internal_fragmentation']:,}")
+            # backend stores the entire job dict in block['job']
+            job_val = self.block_data['job']
+            job_id = job_val['stream'] if isinstance(job_val, dict) else job_val
+            job_info = QLabel(f"Job {job_id} | Frag: {self.block_data['internal_fragmentation']:,}")
             job_info.setFont(QFont("Arial", 9))  # increased font size for better readability
             job_info.setAlignment(Qt.AlignCenter)
             job_info.setStyleSheet("color: #000000; background-color: transparent;")  # ensure text is visible
@@ -70,6 +124,10 @@ class MemoryBlock(QFrame):
         
         self.setLayout(layout)
 
+
+# =================================================================
+# MEMORY ALLOCATION CHART (unchanged external behavior)
+# =================================================================
 class MemoryCanvas(FigureCanvas):
     def __init__(self):
         self.figure = Figure(figsize=(6, 4))  # reduced figure size to fit smaller pane
@@ -100,9 +158,9 @@ class MemoryCanvas(FigureCanvas):
         width = 0.6
         x_pos = np.arange(len(blocks))
         
-        p1 = self.axes.bar(x_pos, used_memory, width, label='Used Memory', color='#FF6B6B')
-        p2 = self.axes.bar(x_pos, fragmentation, width, bottom=used_memory, label='Fragmentation', color='#FFE66D')
-        p3 = self.axes.bar(x_pos, free_memory, width, label='Free Memory', color='#4ECDC4')
+        self.axes.bar(x_pos, used_memory, width, label='Used Memory', color='#FF6B6B')
+        self.axes.bar(x_pos, fragmentation, width, bottom=used_memory, label='Fragmentation', color='#FFE66D')
+        self.axes.bar(x_pos, free_memory, width, label='Free Memory', color='#4ECDC4')
         
         self.axes.set_xlabel('Memory Blocks')
         self.axes.set_ylabel('Size (bytes)')
@@ -118,6 +176,10 @@ class MemoryCanvas(FigureCanvas):
         self.figure.tight_layout()
         self.draw()
 
+
+# =================================================================
+# BACKGROUND THREAD (uses backend step API)
+# =================================================================
 class SimulationWorker(QThread):
     update_signal = pyqtSignal()
     finished_signal = pyqtSignal()
@@ -127,17 +189,19 @@ class SimulationWorker(QThread):
         self.simulator = simulator
         self.running = False
         self.speed = 1.0
+        self.strategy = "first_fit"
     
     def run(self):
         self.running = True
-        while (self.running and 
-               (len(self.simulator.completed_jobs) < len(self.simulator.original_jobs) or
-                not self.simulator.waiting_queue.empty() or
-                any(job['status'] == 'running' for job in self.simulator.jobs))):
-            
-            self.simulator.simulate_step()
+        while self.running:
+            # step the backend sim
+            self.simulator.simulate_step(self.strategy)
             self.update_signal.emit()
             self.msleep(int(1000 / self.speed))
+            
+            # stop when all jobs completed
+            if len(self.simulator.get_completed_jobs()) >= len(self.simulator.get_jobs_state()):
+                break
         
         self.running = False
         self.finished_signal.emit()
@@ -145,150 +209,15 @@ class SimulationWorker(QThread):
     def stop(self):
         self.running = False
 
-class MemorySimulator:
-    def __init__(self):
-        self.original_jobs = [
-            {'stream': 1, 'time': 5, 'size': 5760, 'arrival_time': 0},
-            {'stream': 2, 'time': 4, 'size': 4190, 'arrival_time': 1},
-            {'stream': 3, 'time': 8, 'size': 3290, 'arrival_time': 2},
-            {'stream': 4, 'time': 2, 'size': 2030, 'arrival_time': 3},
-            {'stream': 5, 'time': 2, 'size': 2550, 'arrival_time': 4},
-            {'stream': 6, 'time': 6, 'size': 6990, 'arrival_time': 5},
-            {'stream': 7, 'time': 8, 'size': 8940, 'arrival_time': 6},
-            {'stream': 8, 'time': 10, 'size': 740, 'arrival_time': 7},
-            {'stream': 9, 'time': 7, 'size': 3930, 'arrival_time': 8},
-            {'stream': 10, 'time': 6, 'size': 6890, 'arrival_time': 9},
-            {'stream': 11, 'time': 5, 'size': 6580, 'arrival_time': 10},
-            {'stream': 12, 'time': 8, 'size': 3820, 'arrival_time': 11},
-            {'stream': 13, 'time': 9, 'size': 9140, 'arrival_time': 12},
-            {'stream': 14, 'time': 10, 'size': 420, 'arrival_time': 13},
-            {'stream': 15, 'time': 10, 'size': 220, 'arrival_time': 14},
-            {'stream': 16, 'time': 7, 'size': 7540, 'arrival_time': 15},
-            {'stream': 17, 'time': 3, 'size': 3210, 'arrival_time': 16},
-            {'stream': 18, 'time': 1, 'size': 1380, 'arrival_time': 17},
-            {'stream': 19, 'time': 9, 'size': 9850, 'arrival_time': 18},
-            {'stream': 20, 'time': 3, 'size': 3610, 'arrival_time': 19},
-            {'stream': 21, 'time': 7, 'size': 7540, 'arrival_time': 20},
-            {'stream': 22, 'time': 2, 'size': 2710, 'arrival_time': 21},
-            {'stream': 23, 'time': 8, 'size': 8390, 'arrival_time': 22},
-            {'stream': 24, 'time': 5, 'size': 5950, 'arrival_time': 23},
-            {'stream': 25, 'time': 10, 'size': 760, 'arrival_time': 24},
-        ]
-        
-        self.original_memory = [
-            {'block': 1, 'size': 9500, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 2, 'size': 7000, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 3, 'size': 4500, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 4, 'size': 8500, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 5, 'size': 3000, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 6, 'size': 9000, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 7, 'size': 1000, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 8, 'size': 5500, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 9, 'size': 1500, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0},
-            {'block': 10, 'size': 500, 'status': 'free', 'job': None, 'internal_fragmentation': 0, 'usage_count': 0, 'start_time': 0, 'end_time': 0}
-        ]
-        
-        self.reset_simulation()
-    
-    def reset_simulation(self):
-        self.current_time = 0
-        self.memory = copy.deepcopy(self.original_memory)
-        self.jobs = copy.deepcopy(self.original_jobs)
-        self.waiting_queue = Queue()
-        self.completed_jobs = []
-        
-        for job in self.jobs:
-            job['status'] = 'waiting'
-            job['wait_time'] = 0
-            job['allocated_block'] = None
-    
-    def simulate_step(self):
-        self.current_time += 1
-        
-        # Free completed jobs
-        for block in self.memory:
-            if block['status'] == 'occupied' and block['end_time'] <= self.current_time:
-                self.free_memory_block(block)
-        
-        # Add arriving jobs
-        for job in self.jobs:
-            if job['arrival_time'] == self.current_time and job['status'] == 'waiting':
-                self.waiting_queue.put(job)
-                job['status'] = 'queued'
-        
-        # Try to allocate jobs
-        self.process_waiting_queue()
-        
-        # Update wait times
-        for job in self.jobs:
-            if job['status'] == 'queued':
-                job['wait_time'] += 1
-    
-    def process_waiting_queue(self):
-        temp_queue = Queue()
-        
-        while not self.waiting_queue.empty():
-            job = self.waiting_queue.get()
-            allocated = False
-            
-            if self.algorithm == "First Fit":
-                allocated = self.first_fit_allocate(job)
-            elif self.algorithm == "Best Fit":
-                allocated = self.best_fit_allocate(job)
-            
-            if not allocated:
-                temp_queue.put(job)
-        
-        while not temp_queue.empty():
-            self.waiting_queue.put(temp_queue.get())
-    
-    def first_fit_allocate(self, job):
-        for block in self.memory:
-            if block['status'] == 'free' and block['size'] >= job['size']:
-                self.allocate_memory(job, block)
-                return True
-        return False
-    
-    def best_fit_allocate(self, job):
-        best_block = None
-        for block in self.memory:
-            if block['status'] == 'free' and block['size'] >= job['size']:
-                if best_block is None or block['size'] < best_block['size']:
-                    best_block = block
-        
-        if best_block:
-            self.allocate_memory(job, best_block)
-            return True
-        return False
-    
-    def allocate_memory(self, job, block):
-        block['status'] = 'occupied'
-        block['job'] = job['stream']
-        block['internal_fragmentation'] = block['size'] - job['size']
-        block['usage_count'] += 1
-        block['start_time'] = self.current_time
-        block['end_time'] = self.current_time + job['time']
-        
-        job['status'] = 'running'
-        job['allocated_block'] = block['block']
-    
-    def free_memory_block(self, block):
-        for job in self.jobs:
-            if job['allocated_block'] == block['block'] and job['status'] == 'running':
-                job['status'] = 'completed'
-                self.completed_jobs.append(job)
-                break
-        
-        block['status'] = 'free'
-        block['job'] = None
-        block['internal_fragmentation'] = 0
-        block['start_time'] = 0
-        block['end_time'] = 0
 
+# =================================================================
+# MAIN WINDOW (Frontend)
+# =================================================================
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.simulator = MemorySimulator()
+        # === instantiate backend with required args ===
+        self.simulator = BackendMemorySimulator(ORIGINAL_JOBS, ORIGINAL_MEMORY)
         self.worker = None
         self.memory_blocks_widgets = []
         self.init_ui()
@@ -382,86 +311,18 @@ class MainWindow(QMainWindow):
         # implemented control buttons with different colors for better visual distinction
         self.start_btn = QPushButton("▶ Start")
         self.start_btn.clicked.connect(self.start_simulation)
-        self.start_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;  /* green for start action */
-                border: none;
-                color: white;
-                padding: 8px 16px;
-                text-align: center;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;  /* darker green on hover */
-            }
-            QPushButton:pressed {
-                background-color: #3d8b40;  /* even darker green when pressed */
-            }
-        """)
         control_layout.addWidget(self.start_btn, 0, 2)
         
         self.pause_btn = QPushButton("⏸ Pause")
         self.pause_btn.clicked.connect(self.pause_simulation)
-        self.pause_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FF9800;  /* orange for pause action */
-                border: none;
-                color: white;
-                padding: 8px 16px;
-                text-align: center;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #F57C00;  /* darker orange on hover */
-            }
-            QPushButton:pressed {
-                background-color: #E65100;  /* even darker orange when pressed */
-            }
-        """)
         control_layout.addWidget(self.pause_btn, 0, 3)
         
         self.step_btn = QPushButton("⏭ Step")
         self.step_btn.clicked.connect(self.step_simulation)
-        self.step_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;  /* blue for step action */
-                border: none;
-                color: white;
-                padding: 8px 16px;
-                text-align: center;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;  /* darker blue on hover */
-            }
-            QPushButton:pressed {
-                background-color: #1565C0;  /* even darker blue when pressed */
-            }
-        """)
         control_layout.addWidget(self.step_btn, 1, 0)
         
         self.reset_btn = QPushButton("🔄 Reset")
         self.reset_btn.clicked.connect(self.reset_simulation)
-        self.reset_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #F44336;  /* red for reset action */
-                border: none;
-                color: white;
-                padding: 8px 16px;
-                text-align: center;
-                font-size: 14px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #D32F2F;  /* darker red on hover */
-            }
-            QPushButton:pressed {
-                background-color: #C62828;  /* even darker red when pressed */
-            }
-        """)
         control_layout.addWidget(self.reset_btn, 1, 1)
         
         # Speed control
@@ -489,8 +350,8 @@ class MainWindow(QMainWindow):
         scroll_layout = QVBoxLayout()
         scroll_layout.setSpacing(3)  # minimal spacing between blocks
         
-        # Create memory block widgets
-        for i, block in enumerate(self.simulator.memory):
+        # Create memory block widgets (from backend state)
+        for block in self.simulator.get_memory_state():
             block_widget = MemoryBlock(block)
             self.memory_blocks_widgets.append(block_widget)
             scroll_layout.addWidget(block_widget)
@@ -577,7 +438,7 @@ class MainWindow(QMainWindow):
         self.job_table.setHorizontalHeaderLabels([
             "Job", "Size", "Time", "Status", "Block", "Wait Time", "Arrival"
         ])
-        self.job_table.setRowCount(len(self.simulator.jobs))
+        self.job_table.setRowCount(len(self.simulator.get_jobs_state()))
         self.job_table.setMaximumHeight(450)  # reduced height to balance with increased chart
         
         jobs_layout.addWidget(self.job_table)
@@ -586,8 +447,11 @@ class MainWindow(QMainWindow):
     
     def start_simulation(self):
         if self.worker is None or not self.worker.isRunning():
-            self.simulator.algorithm = self.algorithm_combo.currentText()
+            # map UI -> backend strategy
+            algo = self.algorithm_combo.currentText()
+            strategy = "first_fit" if "First" in algo else "best_fit"
             self.worker = SimulationWorker(self.simulator)
+            self.worker.strategy = strategy
             self.worker.speed = self.speed_slider.value() / 10.0
             self.worker.update_signal.connect(self.update_display)
             self.worker.finished_signal.connect(self.simulation_finished)
@@ -605,8 +469,10 @@ class MainWindow(QMainWindow):
             self.pause_btn.setEnabled(False)
     
     def step_simulation(self):
-        self.simulator.algorithm = self.algorithm_combo.currentText()
-        self.simulator.simulate_step()
+        # single-step using selected strategy
+        algo = self.algorithm_combo.currentText()
+        strategy = "first_fit" if "First" in algo else "best_fit"
+        self.simulator.simulate_step(strategy)
         self.update_display()
     
     def reset_simulation(self):
@@ -614,7 +480,8 @@ class MainWindow(QMainWindow):
             self.worker.stop()
             self.worker.wait()
         
-        self.simulator.reset_simulation()
+        # backend reset
+        self.simulator.reset_memory()
         self.update_display()
         
         self.start_btn.setEnabled(True)
@@ -625,28 +492,23 @@ class MainWindow(QMainWindow):
         self.pause_btn.setEnabled(False)
     
     def update_display(self):
-        # Update time
+        # Update time (backend keeps current_time)
         self.time_label.setText(f"Current Time: {self.simulator.current_time}")
         
         # Update memory blocks
+        mem_state = self.simulator.get_memory_state()
         for i, widget in enumerate(self.memory_blocks_widgets):
-            widget.block_data = self.simulator.memory[i]
+            widget.block_data = mem_state[i]
             widget.update_display()
         
         # Update memory chart
         algorithm = self.algorithm_combo.currentText()
-        self.memory_chart.update_chart(self.simulator.memory, algorithm)
+        self.memory_chart.update_chart(mem_state, algorithm)
         
         # Update waiting queue
         self.queue_list.clear()
-        temp_queue = Queue()
-        while not self.simulator.waiting_queue.empty():
-            job = self.simulator.waiting_queue.get()
-            self.queue_list.addItem(f"Job {job['stream']} - Size: {job['size']:,} - Wait: {job['wait_time']}")
-            temp_queue.put(job)
-        
-        while not temp_queue.empty():
-            self.simulator.waiting_queue.put(temp_queue.get())
+        for job in self.simulator.get_waiting_jobs():
+            self.queue_list.addItem(f"Job {job['stream']} - Size: {job['size']:,} - Wait: {job.get('wait_time', 0)}")
         
         # Update statistics
         self.update_statistics()
@@ -655,26 +517,23 @@ class MainWindow(QMainWindow):
         self.update_job_table()
     
     def update_statistics(self):
-        total_jobs = len(self.simulator.original_jobs)
-        completed = len(self.simulator.completed_jobs)
-        running = sum(1 for job in self.simulator.jobs if job['status'] == 'running')
-        waiting = self.simulator.waiting_queue.qsize()
+        # derive simple stats from backend getters/metrics
+        metrics = self.simulator.get_metrics()
+        jobs = self.simulator.get_jobs_state()
+        mem = self.simulator.get_memory_state()
         
-        total_memory = sum(block['size'] for block in self.simulator.memory)
-        used_memory = sum(block['size'] - block['internal_fragmentation'] 
-                         for block in self.simulator.memory if block['status'] == 'occupied')
+        total_jobs = len(jobs)
+        completed = metrics["completed_jobs"]
+        waiting = metrics["waiting_queue_size"]
         
-        total_fragmentation = sum(block['internal_fragmentation'] for block in self.simulator.memory)
+        total_memory = sum(b['size'] for b in mem)
+        used_memory = sum((b['size'] - b['internal_fragmentation']) for b in mem if b['status'] == 'occupied')
+        total_fragmentation = sum(b['internal_fragmentation'] for b in mem)
+        memory_utilization = (used_memory / total_memory) * 100 if total_memory else 0
+        fragmentation_percentage = (total_fragmentation / total_memory) * 100 if total_memory else 0
         
-        avg_wait_time = (sum(job['wait_time'] for job in self.simulator.completed_jobs) / 
-                        len(self.simulator.completed_jobs)) if self.simulator.completed_jobs else 0
-        
-        throughput = completed / max(self.simulator.current_time, 1)
-        memory_utilization = (used_memory / total_memory) * 100 if total_memory > 0 else 0
-        fragmentation_percentage = (total_fragmentation / total_memory) * 100 if total_memory > 0 else 0
-        
-        never_used = sum(1 for block in self.simulator.memory if block['usage_count'] == 0)
-        heavily_used = sum(1 for block in self.simulator.memory if block['usage_count'] >= 3)
+        avg_wait_time = metrics["avg_wait_time"]
+        throughput = metrics["throughput"]
         
         stats_text = f"""PERFORMANCE METRICS
 {'='*40}
@@ -684,7 +543,6 @@ Current Time: {self.simulator.current_time}
 
 JOB STATUS:
 • Completed: {completed}/{total_jobs}
-• Running: {running}
 • Waiting: {waiting}
 
 THROUGHPUT:
@@ -700,39 +558,39 @@ FRAGMENTATION:
 • Fragmentation %: {fragmentation_percentage:.1f}%
 
 WAITING STATISTICS:
-• Queue Length: {waiting}
 • Avg Wait Time: {avg_wait_time:.2f} units
-
-PARTITION USAGE:
-• Never Used: {never_used}/10 blocks
-• Heavily Used (3+): {heavily_used}/10 blocks
 """
         
         self.stats_text.setPlainText(stats_text)
     
     def update_job_table(self):
-        for i, job in enumerate(self.simulator.jobs):
+        jobs = self.simulator.get_jobs_state()
+        self.job_table.setRowCount(len(jobs))
+        for i, job in enumerate(jobs):
             self.job_table.setItem(i, 0, QTableWidgetItem(str(job['stream'])))
             self.job_table.setItem(i, 1, QTableWidgetItem(f"{job['size']:,}"))
             self.job_table.setItem(i, 2, QTableWidgetItem(str(job['time'])))
             self.job_table.setItem(i, 3, QTableWidgetItem(job['status'].title()))
             self.job_table.setItem(i, 4, QTableWidgetItem(str(job.get('allocated_block', '-'))))
-            self.job_table.setItem(i, 5, QTableWidgetItem(str(job['wait_time'])))
-            self.job_table.setItem(i, 6, QTableWidgetItem(str(job['arrival_time'])))
+            self.job_table.setItem(i, 5, QTableWidgetItem(str(job.get('wait_time', 0))))
+            self.job_table.setItem(i, 6, QTableWidgetItem(str(job.get('arrival_time', '-'))))
             
             # Color code based on status
-            if job['status'] == 'completed':
+            status = job['status']
+            if status == 'completed':
                 color = QColor(212, 237, 218)  # Light green
-            elif job['status'] == 'running':
+            elif status == 'running':
                 color = QColor(255, 243, 205)  # Light yellow
-            elif job['status'] in ['waiting', 'queued']:
+            elif status in ['waiting', 'queued']:
                 color = QColor(248, 215, 218)  # Light red
             else:
                 color = QColor(255, 255, 255)  # White
             
             for j in range(7):
-                if self.job_table.item(i, j):
-                    self.job_table.item(i, j).setBackground(color)
+                it = self.job_table.item(i, j)
+                if it:
+                    it.setBackground(color)
+
 
 def main():
     app = QApplication(sys.argv)
@@ -753,4 +611,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
